@@ -2,6 +2,7 @@ from time import sleep
 import tkinter as tk
 from tkinter import messagebox
 
+
 # Окно
 window = tk.Tk()
 window.title("Калькулятор")
