@@ -2,7 +2,6 @@ from time import sleep
 import tkinter as tk
 from tkinter import messagebox
 
-
 # Окно
 window = tk.Tk()
 window.title("Калькулятор")
@@ -76,6 +75,17 @@ def taylor_ln(x, n=20):
         term = (y**(2*i+1)) / (2*i+1)
         result += term
     return 2 * result
+    
+def taylor_exp(x, n=20):
+    result = 0
+    factorial = 1
+    for i in range(n):
+        if i > 0:
+            factorial *= i  # вычисляем i!
+        term = (x ** i) / factorial
+        result += term
+    return result
+
 
 def sqrt_newton(x, epsilon=1e-10):
     if x < 0:
@@ -102,14 +112,15 @@ buttons = [
     "4", "5", "6", "*", "sin",
     "1", "2", "3", "-", "cos",
     "C", "0", "=", "+", "ln",
-    "%", "sqrt", "(", ")", ".",
-    "Kawaii", "DOS"
+    "%", "sqrt", "(", ")", "exp",
+    ".", "Kawaii", "DOS"
 ]
 
 pr = {
     "sin": 3,
     "cos": 3,
     "sqrt": 3,
+    "exp": 3,
     "ln": 3,
     "^": 2,
     "*": 1,
@@ -146,96 +157,10 @@ def create_big_button(text, style):
         )
 
 current_number = ""
-# Функция обработки нажатия кнопок
-def on_click(event):
-    global current_number
-    first_negative = False
-    button_text = event.widget.cget("text")
 
-    if button_text.isdigit() or button_text == ".":
-        current_number += button_text
-        entry['state'] = 'normal'
-        entry.insert(tk.END, button_text)
-        entry['state'] = 'readonly'
-        return
-
-    if current_number != "":
-        expression_terms.append(current_number)
-        current_number = ""
-
-    if button_text == "C":
-        entry['state'] = 'normal'
-        entry.delete(0, tk.END)
-        entry['state'] = 'readonly'
-        expression_terms.clear()
-        return
-    
-    if button_text == "-" and len(expression_terms) == 0:
-        current_number += "-"
-        first_negative = True
-
-    if button_text == "=":
-        try:
-            rpn = parse_to_rpn()
-            result = calc(rpn)
-            entry['state'] = 'normal'
-            entry.delete(0, tk.END)
-            if (result - int(result) == 0): # Проверяем, является ли результат целым числом, проверяя равенство его дробной части нулю
-                entry.insert(tk.END, str(int(result))) #Если результат целый, нет необходимости выводить точку и нули
-            else:
-                entry.insert(tk.END, str("{:.5f}".format(result)))
-            entry['state'] = 'readonly'
-        except Exception as e:
-            messagebox.showerror("Ошибка", str(e))
-        expression_terms.clear()
-        expression_terms.append(str(result))
-        return
-    if button_text == "Kawaii":
-        window["bg"] = "PINK"
-        create_buttons("kawaii")
-        return
-    if button_text == "DOS":
-        window["bg"] = "BLUE"
-        create_buttons("dos")
-        return
-    # Для операторов, функций, скобок
-    if not first_negative:
-        expression_terms.append(button_text)
-    
-    entry['state'] = 'normal'
-    entry.insert(tk.END, button_text)
-    entry['state'] = 'readonly'
-
-
-# Функция преобразования выражения в RPN
-def parse_to_rpn():
-    rpn_string = []
-    stack = []
-    functions = {"sin", "cos", "sqrt", "ln"}
-
-    for token in expression_terms:
-        if is_digit(token):
-            rpn_string.append(token)
-        elif token in functions or token == "(":
-            stack.append(token)
-        elif token == ")":
-            while stack and stack[-1] != "(":
-                rpn_string.append(stack.pop())
-            if stack and stack[-1] == "(":
-                stack.pop()
-            else:
-                raise ValueError("Несоответствие скобок")
-        else:  # Оператор
-            while stack and stack[-1] in pr and token in pr and pr[stack[-1]] >= pr[token]:
-                rpn_string.append(stack.pop())
-            stack.append(token)
-
-    while stack:
-        if stack[-1] in ("(", ")"):
-            raise ValueError("Несоответствие скобок")
-        rpn_string.append(stack.pop())
-    print(rpn_string)
-    return rpn_string
+def can_fit_in_double(x):
+    max_double = 1.7976931348623157e308
+    return math.isfinite(x) and (-max_double < x < max_double)
 
 # Функция вычисления результата по RPN
 def calc(rpn):
@@ -244,7 +169,8 @@ def calc(rpn):
         "sin": taylor_sin,
         "cos": taylor_cos,
         "sqrt": sqrt_newton,
-        "ln": taylor_ln
+        "ln": taylor_ln,
+        "exp": taylor_exp
     }
 
     for token in rpn:
@@ -286,6 +212,117 @@ def calc(rpn):
         raise ValueError("Ошибка в вычислении выражения")
 
     return stack[0]
+
+# Функция обработки нажатия кнопок
+def on_click(event):
+    global current_number
+    first_negative = False
+    button_text = event.widget.cget("text")
+
+    if button_text.isdigit() or button_text == ".":
+        current_number += button_text
+        entry['state'] = 'normal'
+        entry.insert(tk.END, button_text)
+        entry['state'] = 'readonly'
+        return
+
+    if current_number != "":
+        # Проверяем введённое число на вхождение в double
+        try:
+            num = float(current_number)
+            print(len(current_number))
+            max_length = 100
+            if len(current_number) > max_length:
+                messagebox.showerror("Ошибка", "Слишком большое число!")
+                current_number = ""
+                entry['state'] = 'normal'
+                entry.delete(0, tk.END)
+                entry['state'] = 'readonly'
+                expression_terms.clear()
+                return  # прерываем добавление числа
+        except Exception:
+            pass
+        
+        expression_terms.append(current_number)
+        current_number = ""
+
+    if button_text == "C":
+        entry['state'] = 'normal'
+        entry.delete(0, tk.END)
+        entry['state'] = 'readonly'
+        expression_terms.clear()
+        return
+    
+    if button_text == "-" and len(expression_terms) == 0:
+        current_number += "-"
+        first_negative = True
+
+    if button_text == "=":
+        try:
+            rpn = parse_to_rpn()
+            result = calc(rpn)
+            # Проверяем результат на превышение
+            if not can_fit_in_double(result):
+                raise ValueError("Слишком большое число!")
+            
+            entry['state'] = 'normal'
+            entry.delete(0, tk.END)
+            if (result - int(result) == 0):
+                entry.insert(tk.END, str(int(result)))
+            else:
+                entry.insert(tk.END, "{:.5f}".format(result))
+            entry['state'] = 'readonly'
+        except Exception as e:
+            messagebox.showerror("Ошибка", str(e))
+        expression_terms.clear()
+        return
+
+    if button_text == "Kawaii":
+        window["bg"] = "PINK"
+        create_buttons("kawaii")
+        return
+    if button_text == "DOS":
+        window["bg"] = "BLUE"
+        create_buttons("dos")
+        return
+    # Для операторов, функций, скобок
+    if not first_negative:
+        expression_terms.append(button_text)
+    
+    entry['state'] = 'normal'
+    entry.insert(tk.END, button_text)
+    entry['state'] = 'readonly'
+
+
+# Функция преобразования выражения в RPN
+def parse_to_rpn():
+    rpn_string = []
+    stack = []
+    functions = {"sin", "cos", "sqrt", "ln", "exp"}
+
+    for token in expression_terms:
+        if is_digit(token):
+            rpn_string.append(token)
+        elif token in functions or token == "(":
+            stack.append(token)
+        elif token == ")":
+            while stack and stack[-1] != "(":
+                rpn_string.append(stack.pop())
+            if stack and stack[-1] == "(":
+                stack.pop()
+            else:
+                raise ValueError("Несоответствие скобок")
+        else:  # Оператор
+            while stack and stack[-1] in pr and token in pr and pr[stack[-1]] >= pr[token]:
+                rpn_string.append(stack.pop())
+            stack.append(token)
+
+    while stack:
+        if stack[-1] in ("(", ")"):
+            raise ValueError("Несоответствие скобок")
+        rpn_string.append(stack.pop())
+    print(rpn_string)
+    return rpn_string
 
 # Создание и размещение кнопок
 def create_buttons(style):
